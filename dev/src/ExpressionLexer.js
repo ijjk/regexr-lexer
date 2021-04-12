@@ -16,22 +16,20 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import Utils from "./utils/Utils.js";
-
 export default class ExpressionLexer {
 	constructor() {
 		this.profile = null;
 	}
-	
+
 	set profile(profile) {
 		this._profile = profile;
 		this.string = this.token = this.errors = this.captureGroups = this.namedGroups = null;
 	}
-	
+
 	parse(str) {
 		if (!this._profile) { return null; }
 		if (str === this.string) { return this.token; }
-	
+
 		this.token = null;
 		this._modes = {};
 		this.string = str;
@@ -46,16 +44,16 @@ export default class ExpressionLexer {
 		let profile = this._profile, unquantifiable = profile.unquantifiable;
 		let charTypes = profile.charTypes;
 		let closeIndex = str.lastIndexOf("/");
-		
+
 		for (let i=closeIndex+1; i<l; i++) { this._modes[str[i]] = true; }
-	
+
 		while (i < l) {
 			c = str[i];
-			
+
 			token = {i: i, l: 1, prev: prev, prv: prv, modes:this._modes};
 			if (prev) { prev.next = token; }
 			else { this.token = token; }
-	
+
 			if (i === 0 || i >= closeIndex) {
 				this.parseFlag(str, token);
 			} else if (c === "(" && !charset) {
@@ -115,7 +113,7 @@ export default class ExpressionLexer {
 					token.type = "ignorews";
 				}
 			}
-	
+
 			// post process token:
 			// quantifier:
 			if (token.clss === "quant") {
@@ -148,7 +146,7 @@ export default class ExpressionLexer {
 			if (prv && prv.type === "range" && prv.l === 1) {
 				this.validateRange(str, token);
 			}
-			
+
 			// js warnings:
 			// TODO: this isn't ideal, but I'm hesitant to write a more robust solution for a couple of edge cases.
 			if (profile.id === "js") { this.addJSWarnings(token); }
@@ -164,7 +162,7 @@ export default class ExpressionLexer {
 			prev = token;
 			if (!token.ignore) { prv = token; }
 		}
-	
+
 		// post processing:
 		while (groups.length) {
 			this.addError(groups.pop(), {id: "groupopen"});
@@ -173,7 +171,7 @@ export default class ExpressionLexer {
 		if (charset) {
 			this.addError(charset, {id: "setopen"});
 		}
-	
+
 		return this.token;
 	}
 
@@ -213,18 +211,18 @@ export default class ExpressionLexer {
 			} else { namedgroups[token.name] = token; }
 		}
 	}
-	
+
 	getRef(token, str) {
 		token.clss = "ref";
 		token.group = true;
 		token.relIndex = this.captureGroups.length;
 		token.name = str;
 	}
-	
+
 	matchRefs(refs, indexes, names) {
 		while (refs.length) {
 			let token = refs.pop(), name=token.name, group = names[name];
-	
+
 			if (!group && !isNaN(name)) {
 				let sign = name[0], index = parseInt(name) + ((sign === "+" || sign === "-") ? token.relIndex : 0);
 				if (sign === "-") { index++; }
@@ -242,14 +240,14 @@ export default class ExpressionLexer {
 			}
 		}
 	};
-	
+
 	refToOctal(token) {
 		// PCRE: \# unmatched, \0 \00 \## = octal
 		// JS: \# \0 \00 \## = octal
 		// PCRE matches \8 \9 to "8" "9"
 		// JS: without the u flag \8 \9 match "8" "9" in IE, FF & Chrome, and "\8" "\9" in Safari. We support the former.
 		// JS: with the u flag, Chrome & FF throw an esc error, Safari does not.
-		
+
 		// TODO: handle \0 for PCRE? Would need more testing.
 		// TODO: this doesn't handle two digit refs with 8/9 in them. Ex. \18 - not even sure what this is interpreted as.
 		let name = token.name, profile = this._profile;
@@ -273,14 +271,14 @@ export default class ExpressionLexer {
 			token.error = {id: "unmatchedref"};
 		}
 	};
-	
+
 	mergeNext(token) {
 		let next = token.next;
 		token.next = next.next;
 		token.next.prev = token;
 		token.l++;
 	};
-	
+
 	parseFlag(str, token) {
 		// note that this doesn't deal with misformed patterns or incorrect flags.
 		let i = token.i, c = str[i];
@@ -295,7 +293,7 @@ export default class ExpressionLexer {
 		}
 		//token.clear = true;
 	};
-	
+
 	parseChar(str, token, charset) {
 		let c = str[token.i];
 		token.type = (!charset && this._profile.charTypes[c]) || "char";
@@ -311,7 +309,7 @@ export default class ExpressionLexer {
 		}
 		return token;
 	};
-	
+
 	parseSquareBracket(str, token, charset) {
 		let match;
 		if (this._profile.tokens.posixcharclass && (match = str.substr(token.i).match(/^\[(:|\.)([^\]]*?)\1]/))) {
@@ -346,7 +344,7 @@ export default class ExpressionLexer {
 		}
 		return charset;
 	};
-	
+
 	parseParen(str, token) {
 		/*
 		core:
@@ -367,16 +365,16 @@ export default class ExpressionLexer {
 			mode: ?c-i
 			branchreset: ?|
 		*/
-	
+
 		token.clss = token.type = "group";
 		if (str[token.i+1] !== "?") {
 			token.close = null; // indicates that it needs a close token.
 			token.capture = true;
 			return token;
 		}
-	
+
 		let sub = str.substr(token.i+2), match, s=sub[0];
-	
+
 		if (s === ":") {
 			// (?:foo)
 			token.type = "noncapgroup";
@@ -465,12 +463,12 @@ export default class ExpressionLexer {
 			token.close = null;
 			token.capture = true;
 		}
-	
+
 		if (!this._profile.tokens[token.type]) { token.error = {id: "notsupported"}; }
-	
+
 		return token;
 	};
-	
+
 	parseBackSlash(str, token, charset, closeIndex) {
 		// Note: Chrome does weird things with \x & \u depending on a number of factors, we ignore this.
 		let i = token.i, match, profile = this._profile;
@@ -479,7 +477,7 @@ export default class ExpressionLexer {
 			token.error = {id: "esccharopen"};
 			return;
 		}
-	
+
 		if (!charset && (match = sub.match(/^\d\d?/))) {
 			// \1 to \99
 			// write this as a reference for now, and re-write it later if it doesn't match a group
@@ -491,7 +489,7 @@ export default class ExpressionLexer {
 		if (profile.tokens.namedref && !charset && (c === "g" || c === "k")) {
 			return this.parseRef(token, sub);
 		}
-	
+
 		if (profile.tokens.unicodecat && (!profile.flags.u || this._modes.u) && (c === "p" || c === "P")) {
 			// unicode: \p{Ll} \pL
 			return this.parseUnicode(token, sub);
@@ -563,13 +561,13 @@ export default class ExpressionLexer {
 				token.clss = ExpressionLexer.ANCHOR_TYPES[token.type] ? "anchor" : "charclass";
 				return token;
 			}
-			
+
 			token.code = profile.escCharCodes[c];
 			if (token.code === undefined || token.code === false) {
 				// unrecognized.
 				return this.parseEscChar(token, c);
 			}
-			
+
 			// update SubstLexer if this changes:
 			token.l++;
 			token.type = "esc_"+token.code;
@@ -577,7 +575,7 @@ export default class ExpressionLexer {
 		token.clss = "esc";
 		return token;
 	};
-	
+
 	parseEscChar(token, c) {
 		// unrecognized escchar: \u \a \8, etc
 		// JS: allowed except if u flag set, Safari still allows \8 \9
@@ -592,7 +590,7 @@ export default class ExpressionLexer {
 			token.error = {id: "esccharbad"};
 		}
 	}
-	
+
 	parseRef(token, sub) {
 		// namedref: \k<name> \k'name' \k{name} \g{name}
 		// namedsubroutine: \g<name> \g'name'
@@ -617,7 +615,7 @@ export default class ExpressionLexer {
 		}
 		token.l += match ? match[0].length : 1;
 	};
-	
+
 	parseUnicode(token, sub) {
 		// unicodescript: \p{Cherokee}
 		// unicodecat: \p{Ll} \pL
@@ -640,14 +638,14 @@ export default class ExpressionLexer {
 		token.clss = "charclass"
 		return token;
 	};
-	
+
 	parseMode(token, sub) {
 		// (?i-x)
 		// supported modes in PCRE: i-caseinsens, x-freespacing, s-dotall, m-multiline, U-switchlazy, [J-samename]
 		let match = sub.match(/^[-a-z]+\)/i);
 		if (!match) { return; }
 		let supModes = this._profile.modes;
-		let modes = Utils.copy({}, this._modes), bad=false, not=false, s=match[0], c;
+		let modes = Object.assign({}, this._modes), bad=false, not=false, s=match[0], c;
 		token.on = token.off = "";
 
 		for (let i=0, l=s.length-1; i<l; i++) {
@@ -677,7 +675,7 @@ export default class ExpressionLexer {
 		}
 		return token;
 	}
-	
+
 	parseQuant(str, token) {
 		// quantifier: {0,3} {3} {1,}
 		token.type = token.clss = "quant";
@@ -692,7 +690,7 @@ export default class ExpressionLexer {
 		}
 		return token;
 	};
-	
+
 	validateRange(str, end) {
 		// char range: [a-z] [\11-\n]
 		let next = end, token = end.prv, prv = token.prv;

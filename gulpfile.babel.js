@@ -257,6 +257,58 @@ gulp.task("deploy",
 	)
 );
 
+gulp.task("clean-lexer", () => {
+	return del([
+		"lexer-dist"
+	])
+})
+
+gulp.task("js-lexer", () => {
+	const plugins = [babelPlugin, replacePlugin];
+	return rollup({
+		input: "./dev/src/ExpressionLexer.js",
+		cache: bundleCache,
+		plugins,
+		onwarn: (warning, warn) => {
+			// ignore circular dependency warnings
+			if (warning.code === "CIRCULAR_DEPENDENCY") { return; }
+			warn(warning);
+		}
+	}).then(bundle => {
+		bundleCache = bundle.cache;
+		return bundle.write({
+			format: "cjs",
+			file: `./lexer-dist/lexer.js`,
+			name: "lexer",
+			sourcemap: !isProduction()
+		})
+	}).then(() => {
+		return rollup({
+			input: "./dev/src/profiles/profiles.js",
+			cache: bundleCache,
+			plugins,
+			onwarn: (warning, warn) => {
+				// ignore circular dependency warnings
+				if (warning.code === "CIRCULAR_DEPENDENCY") { return; }
+				warn(warning);
+			}
+		}).then(bundle => {
+			bundleCache = bundle.cache;
+			return bundle.write({
+				format: "cjs",
+				file: `./lexer-dist/profiles.js`,
+				name: "lexer",
+				sourcemap: !isProduction()
+			})
+		});
+	});
+});
+
+gulp.task('build-lexer', gulp.series(
+	cb => cb(),
+	"clean-lexer", "js-lexer"
+))
+
 // helpers
 function createFileHash(filename) {
 	const hash = createHash("sha256");
